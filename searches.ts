@@ -16,7 +16,7 @@ const searches: Search[] = [
     ],
     "price[max]": 400_000,
     "livingArea[min]": 70,
-    "numberOfRooms[min]": "four-rooms",
+    "numberOfRooms[min]": "three-rooms",
     flatBuildingType: "flat-in-residential-building",
   }),
 
