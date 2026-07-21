@@ -9,11 +9,12 @@ const listings = parseListings(fixture);
 const byId = new Map(listings.map((l) => [l.id, l]));
 
 // The fixture is a real capture of https://www.njuskalo.hr/mobiteli?sort=new
-// (see README / test/fixture.html). It contains 40 in-category results plus the
-// two cross-sell rails Njuskalo injects, which must NOT be parsed as results.
+// (see README / test/fixture.html). Of everything on the page only the organic
+// (Regular) and boosted-but-matching (VauVau) listings are results; the rails
+// and the FeaturedStore carousel must NOT be parsed.
 
-test("parses every in-category result and nothing from the cross-sell rails", () => {
-  assert.equal(listings.length, 40);
+test("parses only the real results, not the rails or store carousel", () => {
+  assert.equal(listings.length, 31);
 });
 
 test("the 'Posljednji oglasi' (latest ads) rail is excluded", () => {
@@ -25,9 +26,9 @@ test("the 'Posljednji oglasi' (latest ads) rail is excluded", () => {
 });
 
 test("title is the real ad title, not a category or seller name", () => {
-  const l = byId.get("50394830");
-  assert.ok(l, "expected featured-store ad 50394830");
-  assert.ok(l.title.includes("XIAOMI REDMI NOTE 14 PRO+"), `unexpected title: ${l.title}`);
+  const l = byId.get("48327791");
+  assert.ok(l, "expected regular ad 48327791");
+  assert.ok(l.title.includes("iPhone 17 Pro Max"), `unexpected title: ${l.title}`);
   // No parsed listing should have an empty title.
   assert.ok(listings.every((x) => x.title.length > 0));
 });
@@ -42,11 +43,10 @@ test("priceText matches what is rendered and the number parses", () => {
   assert.equal(thousands?.price, 1290);
 });
 
-test("promoted placements that render no price stay null, not a wrong guess", () => {
-  // Featured-store / SuperVau cards carry no price element in list view.
-  const l = byId.get("50394830");
-  assert.equal(l?.price, null);
-  assert.equal(l?.priceText, null);
+test("the FeaturedStore carousel is excluded (it ignores the search filters)", () => {
+  // 50394830 is a FeaturedStore item. A store's carousel shows its own inventory
+  // on every search regardless of the query, so it must not surface as a result.
+  assert.ok(!byId.has("50394830"), "FeaturedStore ad leaked into results");
 });
 
 test("parsePrice handles Croatian thousands + cents", () => {
@@ -89,8 +89,17 @@ const apartments = parseListings(
 );
 
 test("parses the apartment category and its six-figure prices", () => {
-  assert.equal(apartments.length, 35);
+  assert.equal(apartments.length, 27);
   const l = apartments.find((x) => x.id === "50661822");
   assert.equal(l?.priceText, `350.000 ${EUR}`);
   assert.equal(l?.price, 350000);
+});
+
+test("filter-ignoring FeaturedStore flats do not leak into an apartment search", () => {
+  // These ids are the FeaturedStore carousel on the apartment capture; some are
+  // sub-70 m2 one-room flats that the 70 m2+/3-room+ filter should never return.
+  const aptById = new Map(apartments.map((l) => [l.id, l]));
+  for (const id of ["48799529", "47049346", "50231919"]) {
+    assert.ok(!aptById.has(id), `FeaturedStore flat ${id} leaked past the filter`);
+  }
 });

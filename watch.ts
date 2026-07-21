@@ -106,18 +106,24 @@ export function parsePrice(s: string): number | null {
 }
 
 /**
- * Njuskalo pads every category page with cross-sell rails - "Posljednji oglasi"
- * (latest ads) and "Super Vau oglasi" - that are not this search's results. Their
- * contents are unrelated to the query (a page of phones lists a Lego set and a
- * dictionary) and rotate completely on every load, so if scraped they would never
- * seed quiet and would fire a fresh false alert on every run. Drop their anchors.
+ * Anchors that are never this search's results, and must be dropped:
+ *
+ *  - Cross-sell side rails Njuskalo injects on every page ("Posljednji oglasi",
+ *    "Super Vau oglasi"): off-category (a page of phones lists a Lego set) and
+ *    fully rotating each load, so scraping them fires a fresh false alert a run.
+ *
+ *  - The "Istaknute trgovine" FeaturedStore carousel: a store's own inventory,
+ *    shown on every search while *ignoring the query's filters*. On a filtered
+ *    apartment search (70 m2+, 3+ rooms) it still lists 22 m2 one-room flats, so
+ *    it is pure noise. VauVau and Regular listings do respect the filters and
+ *    stay.
  *
  * This keys on class names, against the usual rule of parsing by URL pattern, but
- * it only ever *removes* known chrome: if the class names change the rails simply
- * reappear - exactly today's behaviour - rather than the parser breaking.
+ * it only ever *removes* known chrome: if the class names change these blocks
+ * simply reappear - exactly the older behaviour - rather than the parser breaking.
  */
-const RAIL_SELECTOR =
-  "[class*='content-supplementary'], [class*='highlightedContentAside']";
+const EXCLUDE_SELECTOR =
+  "[class*='content-supplementary'], [class*='highlightedContentAside'], [class*='FeaturedStore']";
 
 export function parseListings(html: string): Listing[] {
   const $ = load(html);
@@ -127,7 +133,7 @@ export function parseListings(html: string): Listing[] {
     const href = $(el).attr("href") ?? "";
     const id = href.match(AD_ID_RE)?.[1];
     if (!id) return;
-    if ($(el).closest(RAIL_SELECTOR).length) return; // cross-sell rail, not a result
+    if ($(el).closest(EXCLUDE_SELECTOR).length) return; // rail or store promo, not a result
 
     const title = $(el).text().trim().replace(/\s+/g, " ");
     if (!title) return; // image links carry no text

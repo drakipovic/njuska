@@ -43,14 +43,21 @@ and leave the price `null` rather than guess.
 markup changed. It must send a warning and exit non-zero. Silently returning an
 empty list is the main way a tool like this dies without anyone noticing.
 
-**Cross-sell rails are not results.** Every category page carries side rails
-Njuskalo injects itself — "Posljednji oglasi" (latest ads) and "Super Vau
-oglasi". Their ads are off-category (a page of phones lists a Lego set) and
-rotate completely on every load, so scraping them would seed nothing and fire a
-fresh false alert every run. `parseListings` drops anchors inside
-`content-supplementary`/`highlightedContentAside`. Yes, this keys on class
-names, against the rule above — but it only ever *removes* known chrome, so if
-those classes change the rails merely reappear, they never break the parser.
+**Promoted chrome is not results.** Two kinds of injected ads must never be
+parsed as results, or they seed nothing and fire false alerts forever:
+
+- The side rails — "Posljednji oglasi" (latest ads) and "Super Vau oglasi".
+  Off-category (a page of phones lists a Lego set) and fully rotating each load.
+- The "Istaknute trgovine" FeaturedStore carousel — a store's own inventory,
+  shown on every search *ignoring the query's filters*. On a 70 m²+/3-room+
+  apartment search it still lists 22 m² one-room flats. This one is why filtered
+  searches leaked junk.
+
+`parseListings` drops anchors inside `content-supplementary`,
+`highlightedContentAside`, or `FeaturedStore`. VauVau and Regular listings do
+respect the filters and are kept. Yes, this keys on class names, against the rule
+above — but it only ever *removes* known chrome, so if those classes change the
+blocks merely reappear, they never break the parser.
 
 **Promoted placements render no price.** SuperVau and FeaturedStore cards carry
 no price element in list view, so a null price on those is correct, not a parse
