@@ -7,7 +7,8 @@ Runs on a GitHub Actions cron. Single purpose, no framework.
 
 - All code, comments, identifiers and documentation in English. No exceptions.
 - TypeScript, ESM, run directly through `tsx`. No build step.
-- Stay dependency-light. Currently cheerio and nothing else.
+- Dependencies stay minimal and justified: cheerio to parse, playwright to
+  fetch (the site needs a real browser to clear its bot challenge).
 - A search is either a pasted `{ name, url }` or, for filter-heavy categories,
   `search(name, path, filters)` from `njuskalo.ts`. Filter keys are Njuskalo's
   own URL params (`"price[max]"`, `"geo[locationIds]"`, ...), copied from the
@@ -17,7 +18,7 @@ Runs on a GitHub Actions cron. Single purpose, no framework.
 
 | file | role |
 |---|---|
-| `watch.ts` | engine: fetch, parse, filter, notify, state |
+| `watch.ts` | engine: render (headless browser), parse, filter, notify, state |
 | `types.ts` | `Search` and `Listing` types |
 | `njuskalo.ts` | builds search URLs from filter objects; `search()`, `locationIds()` |
 | `searches.ts` | user config, the only file edited regularly |
@@ -69,14 +70,17 @@ case-sensitive logic on top.
 **Price filters skip listings with no parsed price** unless `required: true` is
 set. A missed find is worse than one extra notification.
 
-## Constraints
+## Fetching
 
-- Do not fetch faster than the cron interval. No proxy rotation, no CAPTCHA
-  solving, no anti-bot evasion. If it gets blocked, it gets blocked.
-- GitHub Actions runs from Azure IP ranges, so 403s are an expected failure
-  mode, not a bug to engineer around.
-- On a private repo on the free plan keep the cron at `*/30` or slower. Jobs
-  bill rounded up to a whole minute against a 2,000 minute monthly quota.
+Njuskalo is behind Radware's bot manager: a plain HTTP request gets a JS
+challenge (a redirect to `validate.perfdrive.com`), so `fetch` alone only ever
+captures the block page. `fetchPage` renders each URL in headless Chromium
+(Playwright), which runs the challenge and returns the real markup. The CI
+workflow installs the browser with `npx playwright install --with-deps chromium`.
+
+Be a decent citizen: one browser per run, reused across pages, keep the pause
+between page fetches. No need to crank the cron — Actions minutes are free on a
+public repo, but the site isn't.
 
 ## Verifying changes
 
@@ -84,16 +88,15 @@ set. A missed find is worse than one extra notification.
 npm run watch -- --dry
 ```
 
-Prints every listing found with pass/fail and the rule that rejected it. Sends
-nothing, writes no state. Run it after any parser or filter change.
+Fetches live through the browser and prints every listing with pass/fail and the
+rule that rejected it. Sends nothing, writes no state. Run it after any parser
+or filter change.
 
-For an offline check that does not depend on the site being reachable (plain
-`fetch` is bot-blocked from most IPs, GitHub Actions included), run the parser
-against the committed fixture:
+For a fast offline check that never touches the network, run the parser against
+the committed fixtures:
 
 ```bash
 npm test
 ```
 
-Refresh the fixture with a real browser only when the markup genuinely changes;
-`fetch` alone will just capture Njuskalo's bot wall.
+Refresh a fixture only when the markup genuinely changes.

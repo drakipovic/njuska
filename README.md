@@ -3,12 +3,17 @@
 Polls Njuskalo searches and sends a Telegram message when something new matches. No server, runs on a GitHub Actions cron.
 
 ```
-watch.ts                     engine
+watch.ts                     engine (renders each page in headless Chromium)
 types.ts                     Search / Listing types
+njuskalo.ts                  builds search URLs from a filters object
 searches.ts                  what you hunt  <- the only file you edit regularly
 state/seen.json              committed ad IDs (automatic)
 .github/workflows/watch.yml  cron
 ```
+
+Njuskalo is behind a bot wall (Radware), so a plain HTTP request just gets a JS
+challenge. The fetch runs a real headless browser (Playwright/Chromium) that
+clears the challenge and returns the actual markup.
 
 ## Writing filters
 
@@ -48,6 +53,7 @@ match: (l) => !/\bdo \d+ ?kn\b/i.test(l.title) && l.title.length < 80,
 
 ```bash
 npm install
+npx playwright install chromium   # one-time: the browser the fetch drives
 npm run watch -- --dry
 ```
 
@@ -67,6 +73,8 @@ If it reports 0 listings you're either blocked or the markup changed. The select
 ## Search URLs
 
 Open Njuskalo in a browser, set the filters, **sort by newest**, copy the URL from the address bar. Don't hand-write query params.
+
+For filter-heavy categories (apartments, cars) that you'll tune or run for several cities, `njuskalo.ts` exports `search(name, path, filters)`. Each filter is a line keyed by Njuskalo's own param name (`"price[max]"`, `"geo[locationIds]"`, `"livingArea[min]"`), so you adjust any of them without editing a URL. See the apartment example in `searches.ts`; copy the block to add a city.
 
 Server-side filters (category, price band, region) are cheaper than doing it here, since they cut what gets fetched. Use `searches.ts` for what the site can't express: title keywords, exclusions, regex.
 
@@ -94,7 +102,7 @@ The first run **seeds**: it records everything currently listed and sends nothin
 
 ## Known failure modes
 
-**Datacenter IP.** GitHub runners come from Azure ranges that anti-bot systems rank poorly. If you start seeing 403s or empty pages, that's the cause, not the code.
+**Datacenter IP.** GitHub runners come from Azure ranges that anti-bot systems rank poorly. The headless browser clears Njuskalo's normal JS challenge, but if a run still parses 0 listings, a harder block (or a markup change) is the likely cause, not your filters.
 
 **Cron lag.** `*/15` is the earliest, not the actual. Scheduled workflows are delayed 5–30 minutes routinely and occasionally skipped entirely.
 

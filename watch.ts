@@ -1,4 +1,5 @@
 import { load } from "cheerio";
+import { chromium, type Browser } from "playwright";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -52,18 +53,44 @@ const fold = (s: string) =>
 
 // ---------------------------------------------------------------- fetching
 
+// Njuskalo sits behind Radware's bot manager, which blocks plain HTTP requests
+// with a JavaScript challenge (a redirect to validate.perfdrive.com). Only a
+// real browser that executes the challenge gets the page, so we render with
+// headless Chromium. One browser is launched lazily and reused for the whole run.
+let browser: Browser | null = null;
+
+async function getBrowser(): Promise<Browser> {
+  if (!browser) browser = await chromium.launch({ headless: true });
+  return browser;
+}
+
+async function closeBrowser(): Promise<void> {
+  if (browser) {
+    await browser.close();
+    browser = null;
+  }
+}
+
 async function fetchPage(url: string): Promise<string> {
-  const res = await fetch(url, {
-    headers: {
-      "user-agent": UA,
-      accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-      "accept-language": "hr-HR,hr;q=0.9,en-US;q=0.7,en;q=0.6",
-      "upgrade-insecure-requests": "1",
-    },
-    redirect: "follow",
+  const context = await (await getBrowser()).newContext({
+    userAgent: UA,
+    locale: "hr-HR",
+    viewport: { width: 1366, height: 900 },
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.text();
+  try {
+    const page = await context.newPage();
+    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60_000 });
+    // Wait for the challenge to resolve into the real ad list. If it never does
+    // (a hard block, or genuinely empty results), fall through with whatever
+    // rendered; parseListings returning 0 then trips the "blocked" guard below.
+    await page
+      .waitForSelector("a[href*='-oglas-']", { timeout: 30_000 })
+      .catch(() => {});
+    await page.waitForTimeout(1000); // let late Vue hydration settle
+    return await page.content();
+  } finally {
+    await context.close();
+  }
 }
 
 // ---------------------------------------------------------------- parsing
@@ -384,8 +411,10 @@ const isEntryPoint =
   !!process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 
 if (isEntryPoint) {
-  main().catch((e) => {
-    console.error(e);
-    process.exit(1);
-  });
+  main()
+    .catch((e) => {
+      console.error(e);
+      process.exitCode = 1;
+    })
+    .finally(closeBrowser);
 }
