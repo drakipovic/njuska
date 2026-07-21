@@ -4,9 +4,9 @@ import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { Group, Listing, Pattern, Search } from "./types.ts";
-import searches from "./searches.ts";
 
 const STATE_PATH = "state/seen.json";
+const SEARCHES_PATH = "searches.json";
 const BASE = "https://www.njuskalo.hr";
 const RETENTION_DAYS = 30;
 const MAX_ITEMS_PER_MESSAGE = 10;
@@ -314,6 +314,47 @@ function render(s: Search, items: Listing[]): string {
   return `${head}\n${body}${more}`;
 }
 
+// ---------------------------------------------------------------- searches
+
+/** A search as stored in searches.json — the shape the UI writes. */
+type StoredSearch = Search & { enabled?: boolean };
+
+/**
+ * Load the searches from searches.json (a plain array, or `{ searches: [...] }`).
+ * This file is the single source of truth, written by the web UI and read here.
+ * Disabled entries and anything without a URL are skipped. A `match` function
+ * cannot survive JSON, so JSON searches never have one.
+ */
+export function parseSearches(raw: unknown): Search[] {
+  const nested = (raw as { searches?: unknown })?.searches;
+  const list: StoredSearch[] = Array.isArray(raw)
+    ? (raw as StoredSearch[])
+    : Array.isArray(nested)
+      ? (nested as StoredSearch[])
+      : [];
+  return list
+    .filter((s) => s && typeof s.url === "string" && s.enabled !== false)
+    .map((s) => ({
+      name: s.name?.trim() || s.url,
+      url: s.url,
+      pages: s.pages,
+      all: s.all,
+      any: s.any,
+      none: s.none,
+      price: s.price,
+    }));
+}
+
+async function loadSearches(): Promise<Search[]> {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(await readFile(SEARCHES_PATH, "utf8"));
+  } catch (e) {
+    throw new Error(`cannot read ${SEARCHES_PATH}: ${(e as Error).message}`);
+  }
+  return parseSearches(raw);
+}
+
 // ---------------------------------------------------------------- main
 
 export function withPage(url: string, page: number): string {
@@ -330,7 +371,10 @@ async function main(): Promise<void> {
   }
 
   const state = await loadState();
+  const searches = await loadSearches();
   const problems: string[] = [];
+
+  if (searches.length === 0) console.log("no enabled searches in searches.json");
 
   for (const s of searches) {
     const seen = (state[s.name] ??= {});

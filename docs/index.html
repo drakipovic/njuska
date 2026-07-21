@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>njuskalo-watch &middot; searches</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #fff; --text: #16181d; --muted: #6b7280;
+    --line: #e5e7eb; --accent: #2563eb; --accent-fg: #fff;
+    --danger: #dc2626; --ok: #16a34a; --chip: #eef2ff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1115; --card: #181b22; --text: #e7e9ee; --muted: #9aa2b1;
+      --line: #262a33; --accent: #3b82f6; --accent-fg: #fff;
+      --danger: #f87171; --ok: #4ade80; --chip: #1e2534;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 24px 16px 80px; }
+  header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  h1 { font-size: 20px; margin: 0; }
+  h1 small { color: var(--muted); font-weight: 400; font-size: 13px; }
+  a { color: var(--accent); }
+  button {
+    font: inherit; cursor: pointer; border: 1px solid var(--line);
+    background: var(--card); color: var(--text); border-radius: 8px; padding: 8px 12px;
+  }
+  button.primary { background: var(--accent); color: var(--accent-fg); border-color: transparent; }
+  button.link { border: none; background: none; color: var(--accent); padding: 4px 6px; }
+  button.danger { color: var(--danger); border: none; background: none; padding: 4px 6px; }
+  button:disabled { opacity: .5; cursor: default; }
+  input, textarea {
+    font: inherit; width: 100%; background: var(--card); color: var(--text);
+    border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px;
+  }
+  textarea { resize: vertical; min-height: 60px; word-break: break-all; }
+  label { display: block; font-size: 13px; color: var(--muted); margin: 10px 0 4px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-top: 16px; }
+  .row { display: flex; gap: 10px; align-items: center; }
+  .grow { flex: 1; min-width: 0; }
+  .muted { color: var(--muted); }
+  .chip { display: inline-block; font-size: 12px; background: var(--chip); color: var(--muted); border-radius: 999px; padding: 2px 9px; }
+  .item { border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin-top: 10px; background: var(--card); }
+  .item h3 { margin: 0 0 4px; font-size: 15px; }
+  .item .url { font-size: 12px; color: var(--muted); word-break: break-all; }
+  .item.off { opacity: .55; }
+  .item-actions { display: flex; gap: 4px; margin-top: 8px; }
+  .switch { position: relative; width: 40px; height: 24px; flex: none; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .slider { position: absolute; inset: 0; background: var(--line); border-radius: 999px; transition: .15s; }
+  .slider::before { content: ""; position: absolute; height: 18px; width: 18px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: .15s; }
+  .switch input:checked + .slider { background: var(--ok); }
+  .switch input:checked + .slider::before { transform: translateX(16px); }
+  #status { font-size: 13px; padding: 8px 0; min-height: 20px; }
+  #status.err { color: var(--danger); }
+  #status.ok { color: var(--ok); }
+  .bar { position: sticky; bottom: 0; background: linear-gradient(transparent, var(--bg) 40%); padding-top: 20px; margin-top: 20px; display: flex; gap: 10px; align-items: center; }
+  details summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+  .hide { display: none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>njuskalo&#8209;watch <small>searches</small></h1>
+    <span id="dirty" class="chip hide">unsaved</span>
+  </header>
+
+  <div id="status" class="muted">Loading&#8230;</div>
+
+  <!-- Connection / token -->
+  <details id="conn" class="card">
+    <summary>Connection</summary>
+    <label for="repo">Repository (owner/name)</label>
+    <input id="repo" placeholder="drakipovic/njuska" autocomplete="off">
+    <label for="token">GitHub token (fine-grained, this repo, Contents: read &amp; write)</label>
+    <input id="token" type="password" placeholder="github_pat_&#8230;" autocomplete="off">
+    <p class="muted" style="font-size:12px">
+      Stored only in this browser (localStorage). Create one at
+      <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">github.com/settings &#8594; fine-grained tokens</a>:
+      pick this repo, permission <em>Contents &#8594; Read and write</em>.
+    </p>
+    <div class="row" style="margin-top:8px">
+      <button id="connect" class="primary">Connect</button>
+      <button id="forget" class="link">Forget token</button>
+    </div>
+  </details>
+
+  <!-- Add / edit form -->
+  <div id="editor" class="card hide">
+    <strong id="editorTitle">Add a search</strong>
+    <label for="name">Name</label>
+    <input id="name" placeholder="Zagreb 3S+ / 70m2+ / &lt;=350k" autocomplete="off">
+    <label for="url">Njuskalo URL</label>
+    <textarea id="url" placeholder="Set your filters on njuskalo.hr, then paste the address-bar URL here"></textarea>
+    <label for="exclude">Exclude words (optional, comma-separated &#8212; ad is skipped if its title matches any)</label>
+    <input id="exclude" placeholder="zamjena, najam, hitno" autocomplete="off">
+    <div class="row" style="margin-top:12px">
+      <button id="save" class="primary">Add</button>
+      <button id="cancel" class="link hide">Cancel</button>
+      <span class="grow"></span>
+      <a id="openUrl" class="link hide" target="_blank" rel="noopener">Open on Njuskalo &#8599;</a>
+    </div>
+  </div>
+
+  <div id="list"></div>
+
+  <div class="bar">
+    <button id="commit" class="primary" disabled>Save to GitHub</button>
+    <span id="hint" class="muted" style="font-size:13px"></span>
+  </div>
+</div>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const FILE = "searches.json";
+
+let repo = "", token = "", sha = null;
+let searches = [];       // [{name, url, enabled, none?}]
+let dirty = false;
+let editIndex = -1;      // -1 = adding, >=0 = editing that row
+
+// ---- utils --------------------------------------------------------------
+function b64encode(str) {
+  const bytes = new TextEncoder().encode(str);
+  let bin = ""; for (const b of bytes) bin += String.fromCharCode(b);
+  return btoa(bin);
+}
+function b64decode(b64) {
+  const bin = atob(String(b64).replace(/\s/g, ""));
+  const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
+}
+function status(msg, kind) { const el = $("status"); el.textContent = msg; el.className = kind || "muted"; }
+function esc(s) { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+function setDirty(v) {
+  dirty = v; $("dirty").classList.toggle("hide", !v);
+  $("commit").disabled = !v; $("hint").textContent = v ? "You have unsaved changes." : "";
+}
+
+// ---- GitHub API ---------------------------------------------------------
+async function gh(path, opts) {
+  opts = opts || {};
+  const res = await fetch("https://api.github.com/repos/" + repo + "/" + path, {
+    ...opts,
+    headers: {
+      Authorization: "Bearer " + token,
+      Accept: "application/vnd.github+json",
+      "X-GitHub-Api-Version": "2022-11-28",
+      ...(opts.headers || {}),
+    },
+  });
+  if (!res.ok) {
+    let detail = res.status;
+    try { detail = (await res.json()).message || res.status; } catch (e) {}
+    throw new Error("GitHub " + res.status + ": " + detail);
+  }
+  return res.status === 204 ? null : res.json();
+}
+
+async function loadSearches() {
+  status("Loading searches…");
+  const data = await gh("contents/" + FILE);
+  sha = data.sha;
+  const parsed = JSON.parse(b64decode(data.content));
+  searches = Array.isArray(parsed) ? parsed : (parsed.searches || []);
+  render();
+  status(searches.length + " search(es) loaded.", "ok");
+}
+
+async function commit() {
+  $("commit").disabled = true;
+  status("Saving to GitHub…");
+  try {
+    // Re-read the latest sha so we never clobber a concurrent change.
+    const cur = await gh("contents/" + FILE);
+    const body = {
+      message: "searches: update via UI",
+      content: b64encode(JSON.stringify({ searches }, null, 2) + "\n"),
+      sha: cur.sha,
+    };
+    const res = await gh("contents/" + FILE, { method: "PUT", body: JSON.stringify(body) });
+    sha = res.content.sha;
+    setDirty(false);
+    status("Saved. The next scheduled run (within ~15 min) will use it.", "ok");
+  } catch (e) {
+    status(e.message, "err");
+    $("commit").disabled = false;
+  }
+}
+
+// ---- rendering ----------------------------------------------------------
+function render() {
+  const list = $("list");
+  list.innerHTML = "";
+  if (!searches.length) {
+    list.innerHTML = '<p class="muted" style="margin-top:16px">No searches yet. Add one above.</p>';
+    return;
+  }
+  searches.forEach((s, i) => {
+    const on = s.enabled !== false;
+    const el = document.createElement("div");
+    el.className = "item" + (on ? "" : " off");
+    el.innerHTML =
+      '<div class="row">' +
+        '<label class="switch"><input type="checkbox" ' + (on ? "checked" : "") +
+          ' data-toggle="' + i + '"><span class="slider"></span></label>' +
+        '<div class="grow">' +
+          "<h3>" + esc(s.name || "(unnamed)") + "</h3>" +
+          '<div class="url">' + esc(s.url || "") + "</div>" +
+          (s.none && s.none.length ? '<div class="url">exclude: ' + esc(s.none.join(", ")) + "</div>" : "") +
+        "</div>" +
+      "</div>" +
+      '<div class="item-actions">' +
+        '<a class="link" href="' + esc(s.url || "#") + '" target="_blank" rel="noopener">Open &#8599;</a>' +
+        '<button class="link" data-edit="' + i + '">Edit</button>' +
+        '<button class="danger" data-del="' + i + '">Delete</button>' +
+      "</div>";
+    list.appendChild(el);
+  });
+}
+
+function startAdd() {
+  editIndex = -1;
+  $("editorTitle").textContent = "Add a search";
+  $("save").textContent = "Add";
+  $("cancel").classList.add("hide");
+  $("name").value = ""; $("url").value = ""; $("exclude").value = "";
+  $("openUrl").classList.add("hide");
+}
+function startEdit(i) {
+  editIndex = i; const s = searches[i];
+  $("editorTitle").textContent = "Edit search";
+  $("save").textContent = "Update";
+  $("cancel").classList.remove("hide");
+  $("name").value = s.name || ""; $("url").value = s.url || "";
+  $("exclude").value = (s.none || []).join(", ");
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function saveEntry() {
+  const name = $("name").value.trim();
+  const url = $("url").value.trim();
+  const none = $("exclude").value.split(",").map((x) => x.trim()).filter(Boolean);
+  if (!url) { status("A URL is required.", "err"); return; }
+  try { new URL(url); } catch (e) { status("That URL does not look valid.", "err"); return; }
+  const entry = { name: name || url, url, enabled: true };
+  if (none.length) entry.none = none;
+  if (editIndex >= 0) {
+    entry.enabled = searches[editIndex].enabled !== false; // keep on/off state
+    searches[editIndex] = entry;
+  } else {
+    searches.push(entry);
+  }
+  setDirty(true);
+  startAdd();
+  render();
+  status("Staged. Click “Save to GitHub” to publish.", "ok");
+}
+
+// ---- events -------------------------------------------------------------
+$("list").addEventListener("click", (e) => {
+  const t = e.target;
+  if (t.dataset.del != null) {
+    const i = +t.dataset.del;
+    if (confirm('Delete "' + (searches[i].name || searches[i].url) + '"?')) {
+      searches.splice(i, 1); setDirty(true); render();
+    }
+  } else if (t.dataset.edit != null) {
+    startEdit(+t.dataset.edit);
+  }
+});
+$("list").addEventListener("change", (e) => {
+  if (e.target.dataset.toggle != null) {
+    const i = +e.target.dataset.toggle;
+    searches[i].enabled = e.target.checked;
+    setDirty(true); render();
+  }
+});
+$("save").addEventListener("click", saveEntry);
+$("cancel").addEventListener("click", startAdd);
+$("commit").addEventListener("click", commit);
+$("url").addEventListener("input", () => {
+  const v = $("url").value.trim();
+  const a = $("openUrl");
+  if (/^https?:\/\//.test(v)) { a.href = v; a.classList.remove("hide"); } else { a.classList.add("hide"); }
+});
+
+async function connect() {
+  repo = $("repo").value.trim().replace(/^https?:\/\/github\.com\//, "").replace(/\/$/, "");
+  token = $("token").value.trim();
+  if (!repo || !token) { status("Enter a repository and a token.", "err"); return; }
+  localStorage.setItem("nw_repo", repo);
+  localStorage.setItem("nw_token", token);
+  try {
+    await loadSearches();
+    $("conn").open = false;
+    $("editor").classList.remove("hide");
+  } catch (e) {
+    status(e.message + "  (check the token scope and repo name)", "err");
+  }
+}
+$("connect").addEventListener("click", connect);
+$("forget").addEventListener("click", () => {
+  localStorage.removeItem("nw_token"); $("token").value = ""; token = "";
+  status("Token forgotten.", "muted");
+});
+
+// ---- boot ---------------------------------------------------------------
+(function boot() {
+  // Default repo from the Pages URL: owner.github.io/repo/
+  let guess = "drakipovic/njuska";
+  const parts = location.pathname.split("/").filter(Boolean);
+  if (location.hostname.endsWith(".github.io") && parts.length) {
+    guess = location.hostname.replace(".github.io", "") + "/" + parts[0];
+  }
+  $("repo").value = localStorage.getItem("nw_repo") || guess;
+  const savedToken = localStorage.getItem("nw_token");
+  if (savedToken) {
+    $("token").value = savedToken;
+    connect();
+  } else {
+    status("Add a GitHub token under Connection to begin.", "muted");
+    $("conn").open = true;
+  }
+  startAdd();
+})();
+</script>
+</body>
+</html>

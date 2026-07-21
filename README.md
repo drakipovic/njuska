@@ -5,11 +5,16 @@ Polls Njuskalo searches and sends a Telegram message when something new matches.
 ```
 watch.ts                     engine (renders each page in headless Chromium)
 types.ts                     Search / Listing types
-njuskalo.ts                  builds search URLs from a filters object
-searches.ts                  what you hunt  <- the only file you edit regularly
+searches.json                what you hunt (name + URL per search)
+docs/index.html              web UI to edit searches.json, hosted on GitHub Pages
+njuskalo.ts                  optional helper to build a URL from a filters object
 state/seen.json              committed ad IDs (automatic)
 .github/workflows/watch.yml  cron
 ```
+
+Add or edit searches in the **web UI** (GitHub Pages) — it commits `searches.json`
+for you, no code and no manual commit. The cron reads that file on its next run.
+Power users can also hand-edit `searches.json` directly.
 
 Njuskalo is behind a bot wall (Radware), so a plain HTTP request just gets a JS
 challenge. The fetch runs a real headless browser (Playwright/Chromium) that
@@ -17,19 +22,30 @@ clears the challenge and returns the actual markup.
 
 ## Writing filters
 
-Everything lives in `searches.ts`. It's TypeScript, so you get autocomplete and the typechecker catches mistakes before a run.
+Searches live in `searches.json`. The web UI writes the two fields you need — a
+name and the Njuskalo URL — but the file supports the full set for anyone editing
+it by hand:
 
-```ts
+```json
 {
-  name: "iPhone",
-  url: "https://www.njuskalo.hr/mobiteli?sort=new",
-  all:  [["iphone"], ["iphone 13", "iphone 14"], ["128", "256"]],
-  none: ["kuciste", "maskica", "zamjena", "za dijelove", "kupujem"],
-  price: { max: 600 },
+  "searches": [
+    {
+      "name": "iPhone",
+      "url": "https://www.njuskalo.hr/mobiteli?sort=new",
+      "enabled": true,
+      "all":  [["iphone"], ["iphone 13", "iphone 14"], ["128", "256"]],
+      "none": ["kuciste", "maskica", "zamjena", "za dijelove", "kupujem"],
+      "price": { "max": 600 }
+    }
+  ]
 }
 ```
 
-Three list fields, each holding **groups**. A group is one pattern or an array of alternatives.
+`enabled: false` parks a search without deleting it. Most Njuskalo filters
+(price, area, rooms, region) are better set on the site and baked into the URL;
+the fields below are for what the URL can't express — title keywords the UI
+exposes `none` as its "exclude words". Three list fields, each holding **groups**.
+A group is one pattern or an array of alternatives.
 
 | field | passes when |
 |---|---|
@@ -74,9 +90,12 @@ If it reports 0 listings you're either blocked or the markup changed. The select
 
 Open Njuskalo in a browser, set the filters, **sort by newest**, copy the URL from the address bar. Don't hand-write query params.
 
-For filter-heavy categories (apartments, cars) that you'll tune or run for several cities, `njuskalo.ts` exports `search(name, path, filters)`. Each filter is a line keyed by Njuskalo's own param name (`"price[max]"`, `"geo[locationIds]"`, `"livingArea[min]"`), so you adjust any of them without editing a URL. See the apartment example in `searches.ts`; copy the block to add a city.
+In the UI you just paste the URL. If you'd rather build one from filter fields in
+code, `njuskalo.ts` exports `search(name, path, filters)` keyed by Njuskalo's own
+params (`"price[max]"`, `"geo[locationIds]"`, ...) — handy for generating a URL to
+drop into `searches.json`.
 
-Server-side filters (category, price band, region) are cheaper than doing it here, since they cut what gets fetched. Use `searches.ts` for what the site can't express: title keywords, exclusions, regex.
+Server-side filters (category, price band, region) are cheaper than doing it here, since they cut what gets fetched. Use the title fields for what the site can't express: keywords, exclusions, regex.
 
 `pages` defaults to 1, which is fine when polling frequently.
 
@@ -100,6 +119,12 @@ The first run **seeds**: it records everything currently listed and sends nothin
 
 `npm run reset` clears state and makes the next run seed again.
 
+**Search UI (GitHub Pages)**
+
+1. Settings → Pages → Source: *Deploy from a branch* → branch `main`, folder `/docs`. Your UI is at `https://<you>.github.io/<repo>/`.
+2. Create a **fine-grained token** at github.com → Settings → Developer settings → *Fine-grained tokens*: scope it to this one repo, permission *Contents → Read and write*.
+3. Open the Pages URL, paste the token under **Connection**, and manage searches. Each save is an automated commit to `searches.json`; the next cron run picks it up. The token is stored only in your browser.
+
 ## Known failure modes
 
 **Datacenter IP.** GitHub runners come from Azure ranges that anti-bot systems rank poorly. The headless browser clears Njuskalo's normal JS challenge, but if a run still parses 0 listings, a harder block (or a markup change) is the likely cause, not your filters.
@@ -110,4 +135,4 @@ The first run **seeds**: it records everything currently listed and sends nothin
 
 **Quiet zero.** Parsing 0 listings is treated as an error and sends a warning, not as "nothing new". Without that the scraper dies and you assume the market is quiet.
 
-**Public repo note.** `searches.ts` reveals what you're hunting. If that matters, gitignore it and write it from a secret in the workflow before the run step.
+**Public repo note.** `searches.json` reveals what you're hunting, and the UI needs a repo-scoped GitHub token (kept only in your browser). If that matters, make the repo private — Actions still runs, though scheduled cron then counts against the 2,000-minute free quota, so use `*/30`.

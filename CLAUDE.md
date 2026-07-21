@@ -9,10 +9,10 @@ Runs on a GitHub Actions cron. Single purpose, no framework.
 - TypeScript, ESM, run directly through `tsx`. No build step.
 - Dependencies stay minimal and justified: cheerio to parse, playwright to
   fetch (the site needs a real browser to clear its bot challenge).
-- A search is either a pasted `{ name, url }` or, for filter-heavy categories,
-  `search(name, path, filters)` from `njuskalo.ts`. Filter keys are Njuskalo's
-  own URL params (`"price[max]"`, `"geo[locationIds]"`, ...), copied from the
-  browser, so every filter the site offers is adjustable without new code.
+- Searches live in `searches.json` (name + a pasted Njuskalo URL per entry), the
+  single source of truth the engine reads at runtime. They are edited through the
+  web UI in `docs/` (GitHub Pages), which commits the file via the GitHub API — so
+  adding a search needs no code change and no manual commit.
 
 ## Layout
 
@@ -20,8 +20,9 @@ Runs on a GitHub Actions cron. Single purpose, no framework.
 |---|---|
 | `watch.ts` | engine: render (headless browser), parse, filter, notify, state |
 | `types.ts` | `Search` and `Listing` types |
-| `njuskalo.ts` | builds search URLs from filter objects; `search()`, `locationIds()` |
-| `searches.ts` | user config, the only file edited regularly |
+| `searches.json` | the searches (name + URL), written by the UI, read by the engine |
+| `docs/index.html` | the web UI (GitHub Pages) that edits `searches.json` via the GitHub API |
+| `njuskalo.ts` | optional helper to build a Njuskalo URL from a filters object |
 | `state/seen.json` | ad IDs already seen, committed by CI |
 | `test/fixture.html` | a real `/mobiteli` capture, frozen as the parser fixture |
 | `test/apartments.html` | a real `/prodaja-stanova` capture (six-figure prices) |

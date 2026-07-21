@@ -1,0 +1,9 @@
+{
+  "searches": [
+    {
+      "name": "Zagreb 4S+ / 70m2+ / <=400k / parking",
+      "url": "https://www.njuskalo.hr/prodaja-stanova?geo%5BlocationIds%5D=1261%2C2634%2C2649%2C2651%2C2664%2C2668%2C2672%2C2674%2C2675%2C2676%2C13739%2C2703%2C2705%2C13740%2C2716%2C2719%2C2819%2C2821%2C2659%2C2667%2C2669%2C2662%2C2663%2C2660%2C2707%2C12934%2C2726%2C2733%2C2817%2C2822%2C2820%2C2816&price%5Bmax%5D=400000&livingArea%5Bmin%5D=70&numberOfRooms%5Bmin%5D=three-rooms&flatBuildingType=flat-in-residential-building&sort=new",
+      "enabled": true
+    }
+  ]
+}
