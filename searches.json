@@ -9,6 +9,11 @@
       "name": "veliki stanovi",
       "url": "https://www.njuskalo.hr/prodaja-stanova?geo[locationIds]=1261,2634,2649,2651,2664,2668,2672,2674,2675,2676,13739,2703,2705,13740,2716,2719,2819,2821,2659,2667,2669,2662,2663,2660,2707,12934,2726,2733,2817,2822,2820,2816&price[max]=400000&livingArea[min]=80&flatBuildingType=flat-in-residential-building&numberOfRooms[min]=four-rooms&numberOfParkingSpots[min]=1",
       "enabled": true
+    },
+    {
+      "name": "Zagreb Kuce 150m2+",
+      "url": "https://www.njuskalo.hr/prodaja-kuca?geo[locationIds]=1253,1256,1257,1263,1251&price[max]=400000&livingArea[min]=150&otherAreas[garden]=1",
+      "enabled": true
     }
   ]
 }
