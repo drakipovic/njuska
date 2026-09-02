@@ -14,6 +14,11 @@
       "name": "Zagreb Kuce 150m2+",
       "url": "https://www.njuskalo.hr/prodaja-kuca?geo[locationIds]=1253,1256,1257,1263,1251&price[max]=400000&livingArea[min]=150&otherAreas[garden]=1",
       "enabled": true
+    },
+    {
+      "name": "Zagreb Maksimir mali stanovi",
+      "url": "https://www.njuskalo.hr/prodaja-stanova/maksimir?livingArea[min]=35&livingArea[max]=55",
+      "enabled": true
     }
   ]
 }
